@@ -1,10 +1,13 @@
 """FastAPI application exposing local Ollama chat as an HTTP API."""
 
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from ollama import AsyncClient, ResponseError
 
 from app.config import settings
@@ -21,6 +24,14 @@ app = FastAPI(
     title="Ollama Python Chat API",
     description="A small REST API for chatting with locally hosted Ollama models.",
     version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(settings.cors_origins),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 ClientDependency = Annotated[AsyncClient, Depends(get_ollama_client)]
@@ -55,13 +66,6 @@ def _ollama_http_error(error: Exception) -> HTTPException:
             f"at {settings.ollama_host}."
         )
     return HTTPException(status_code=status_code, detail=detail)
-
-
-@app.get("/", include_in_schema=False)
-async def root() -> dict[str, str]:
-    """Point visitors to the interactive API documentation."""
-
-    return {"message": "Ollama Python Chat API", "docs": "/docs"}
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
@@ -132,3 +136,16 @@ async def stream_chat(
 
     return StreamingResponse(content_chunks(), media_type="text/plain; charset=utf-8")
 
+
+# When `npm run build` has created the React bundle, serve it from the same
+# process as the API. API and documentation routes above retain priority.
+frontend_dist = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+if frontend_dist.is_dir():
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+else:
+
+    @app.get("/", include_in_schema=False)
+    async def root() -> dict[str, str]:
+        """Point visitors to the API docs when the frontend is not built."""
+
+        return {"message": "Ollama Python Chat API", "docs": "/docs"}

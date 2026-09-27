@@ -209,6 +209,11 @@ tempCodeRunnerFile.py
 # PyPI configuration file
 .pypirc
 
+# React / Vite
+node_modules/
+frontend/dist/
+npm-debug.log*
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

@@ -107,3 +107,15 @@ def test_empty_messages_are_rejected() -> None:
 
     assert response.status_code == 422
 
+
+def test_frontend_development_origin_is_allowed() -> None:
+    response = client.options(
+        "/api/chat",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"

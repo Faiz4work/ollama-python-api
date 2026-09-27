@@ -6,6 +6,8 @@ local large language model through simple HTTP requests.
 
 The project includes:
 
+- a responsive React chat interface;
+- conversation threads saved in the browser sidebar;
 - normal and streaming chat responses;
 - system prompts;
 - multi-turn conversation history;
@@ -43,6 +45,14 @@ ollama-python-api/
 |   |-- dependencies.py    # Reusable asynchronous Ollama client
 |   |-- main.py            # FastAPI routes and Ollama integration
 |   `-- schemas.py         # Request and response validation
+|-- frontend/
+|   |-- src/
+|   |   |-- App.jsx       # Chat state, streaming, and saved threads
+|   |   |-- ChatTemplate.jsx # Single-page chat markup
+|   |   `-- styles.css    # Responsive application design
+|   |-- index.html
+|   |-- package.json
+|   `-- vite.config.js    # Development proxy to FastAPI
 |-- tests/
 |   `-- test_api.py        # API tests using a fake Ollama client
 |-- .env.example
@@ -57,6 +67,7 @@ Install these before continuing:
 
 - [Python 3.10 or newer](https://www.python.org/downloads/)
 - [Ollama](https://ollama.com/download)
+- [Node.js 20.19 or newer](https://nodejs.org/) for the React interface
 - Git (optional, but recommended)
 
 Confirm that Python and Ollama are available:
@@ -64,6 +75,7 @@ Confirm that Python and Ollama are available:
 ```bash
 python --version
 ollama --version
+node --version
 ```
 
 ## 2. Clone the repository
@@ -139,6 +151,7 @@ OLLAMA_TIMEOUT=120
 | `OLLAMA_HOST` | Address of the Ollama server | `http://localhost:11434` |
 | `OLLAMA_MODEL` | Model used when a request omits `model` | `llama3.2:1b` |
 | `OLLAMA_TIMEOUT` | Maximum wait for Ollama, in seconds | `120` |
+| `CORS_ORIGINS` | Browser origins allowed during development | Vite's local URLs |
 
 ## 6. Start Ollama and the Python API
 
@@ -171,7 +184,58 @@ Open one of the automatically generated documentation pages:
 Swagger UI lets you expand an endpoint, click **Try it out**, enter JSON, and
 send a request without installing a separate API client.
 
-## 7. Send your first chat request
+## 7. Start the React chat interface
+
+The frontend is a single-page React application. It streams answers as Ollama
+generates them and saves conversation threads in the browser's `localStorage`.
+No chat database is required.
+
+For frontend development, keep FastAPI running and open a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open <http://127.0.0.1:5173>. Vite forwards `/api` requests to FastAPI at
+`http://127.0.0.1:8000`.
+
+The interface provides:
+
+- a left sidebar containing saved conversation threads;
+- automatic thread titles based on the first question;
+- thread deletion and a **New conversation** button;
+- model selection from the models installed in Ollama;
+- streaming Markdown, tables, lists, and code blocks;
+- a stop-generation button and connection indicator; and
+- a responsive sidebar for phones and narrow screens.
+
+Threads are local to one browser profile. Clearing site storage also clears
+the saved threads. The API itself remains stateless and does not receive old
+threads unless the interface includes them in a new chat request.
+
+### Build and serve everything from FastAPI
+
+Create an optimized React bundle:
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+Now start FastAPI:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+FastAPI detects `frontend/dist` and serves the chat interface at
+<http://127.0.0.1:8000>. API documentation remains available at `/docs`.
+
+## 8. Send your first chat request
 
 The `/api/chat` endpoint waits for the model to finish, then returns one JSON
 response.
@@ -214,7 +278,7 @@ The exact answer varies, but the response has this shape:
 Each item in `messages` has a `role` (`system`, `user`, or `assistant`) and
 non-empty `content`.
 
-## 8. Stream a response
+## 9. Stream a response
 
 A complete answer may take several seconds. The `/api/chat/stream` endpoint
 returns each text chunk immediately, producing the same typing effect shown by
@@ -235,7 +299,7 @@ curl -N -X POST http://127.0.0.1:8000/api/chat/stream \
 This endpoint returns plain text rather than JSON because it sends the answer
 before the complete message exists.
 
-## 9. Give the model a system prompt
+## 10. Give the model a system prompt
 
 A system prompt defines how the assistant should behave. The API places the
 `system` value before the conversation messages sent to Ollama.
@@ -255,7 +319,7 @@ System prompts can set tone, response length, expertise, output format, or
 other rules. They guide a model but do not provide a security boundary, so
 server-side code must still validate anything important.
 
-## 10. Preserve conversation history
+## 11. Preserve conversation history
 
 Ollama does not know about earlier HTTP requests automatically. A client keeps
 context by sending earlier user and assistant messages again with each new
@@ -278,7 +342,7 @@ data. The calling application decides where history lives and which messages
 to send. As a conversation grows, trim or summarize older messages so the
 model's context window is not exceeded.
 
-## 11. Select a model and temperature
+## 12. Select a model and temperature
 
 The model and generation temperature can be changed for one request:
 
@@ -353,7 +417,7 @@ python -m pytest -q
 Expected result:
 
 ```text
-5 passed
+6 passed
 ```
 
 ## Troubleshooting
